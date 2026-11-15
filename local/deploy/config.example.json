@@ -1,0 +1,21 @@
+{
+  "url": "http://127.0.0.1:3350",
+  "hub": {
+    "listen": "127.0.0.1:3350",
+    "publicUrl": "http://127.0.0.1:3350"
+  },
+  "worker": {
+    "name": "zhangjiaxingdemacbook-pro",
+    "key": "<worker-key>"
+  },
+  "source": {
+    "name": "local",
+    "key": "<local-source-key>"
+  },
+  "owner": "<owner-key>",
+  "channels": {
+    "desktop": {
+      "key": "<desktop-channel-key>"
+    }
+  }
+}
