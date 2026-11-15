@@ -1,10 +1,25 @@
 // Codex: the user's own, installed and signed in by them. A run is a `codex exec` in the background; its thread is kept
 // on disk, so a retry or an answer can go on in it, and the link opens it in the app.
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { commandLine, powershell, psQuote } from "../../host/command.ts";
 import { findProgram, tail, type Adapter } from "../../worker/agents.ts";
 
 const SANDBOX = { read: "read-only", edit: "workspace-write", full: "danger-full-access" };
+function usesCustomProvider() {
+  try {
+    const home = process.env.CODEX_HOME || `${homedir()}/.codex`;
+    const config = readFileSync(`${home}/config.toml`, "utf8");
+    return (
+      /^\s*model_provider\s*=\s*"[^"]+"/m.test(config) &&
+      /^\s*requires_openai_auth\s*=\s*false\b/m.test(config) &&
+      /^\s*\[model_providers\.[^\]]+\]/m.test(config)
+    );
+  } catch {
+    return false;
+  }
+}
 export const IN_THE_APP = [
   "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
   "/Applications/Codex.app/Contents/Resources/codex",
@@ -95,6 +110,7 @@ export default {
       });
       return null;
     } catch (error) {
+      if (usesCustomProvider()) return null;
       return `Codex 没有登录或用不了：运行 codex login（${(error as Error).message.split("\n")[0]}）`;
     }
   },

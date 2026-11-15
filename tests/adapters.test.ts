@@ -11,14 +11,16 @@
 // exists and the work looks untouched; or, carried along, it replaces one the last turn wrote wrongly, so a cancelled
 // review comes back. Claude's tokens leave out what it read from its cache while the others' count it, so the same
 // work reads as a fraction of Codex's. A line of output that's JSON
-// but no message, like `null`, stops a plugin reading anything. A command line's placeholder pass rewrites the prompt
-// itself — a `{cwd}` or a `$&` the person wrote arrives as the folder or as `{prompt}` — so the program is asked
+// but no message, like `null`, stops a plugin reading anything. A program using a third-party provider is said to be
+// logged out. A command line's placeholder pass rewrites the prompt itself — a `{cwd}` or a `$&` the person wrote
+// arrives as the folder or as `{prompt}` — so the program is asked
 // something other than what the event said. A built-in agent starts the program it finds, not the one its rules name,
 // so a wrapper that sends Claude Code to another service is never run. A service tier the rules name for Codex never
 // reaches its command line, so the run takes whatever tier the machine's own Codex config has that day. A program
 // missing for a moment, as while an update reinstalls it, stays missing until the worker restarts.
 import assert from "node:assert/strict";
-import { writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { setup } from "./helpers.ts";
@@ -356,6 +358,32 @@ test("Codex: a turn that got going says so, however it ended; one that never did
   const missing = "Error: thread/resume: thread/resume failed: no rollout found for thread id x (code -32600)";
   assert.equal(codex.read("", 1, missing).started, undefined);
   assert.equal(codex.read("", 1, "cannot resume: active writer").started, undefined);
+});
+
+test("Codex: a custom provider login is not reported as missing", () => {
+  const home = mkdtempSync(join(tmpdir(), "agent-autoloop-codex-home-"));
+  const previous = process.env.CODEX_HOME;
+  try {
+    process.env.CODEX_HOME = home;
+    writeFileSync(
+      join(home, "config.toml"),
+      [
+        'model_provider = "third-party"',
+        "",
+        "[model_providers.third-party]",
+        'name = "Third party"',
+        'base_url = "https://example.invalid/v1"',
+        "requires_openai_auth = false",
+      ].join("\n"),
+    );
+    assert.equal(codex.check?.("/bin/false"), null);
+    rmSync(join(home, "config.toml"));
+    assert.match(codex.check?.("/bin/false") ?? "", /Codex 没有登录或用不了/);
+  } finally {
+    if (previous === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = previous;
+    rmSync(home, { recursive: true, force: true });
+  }
 });
 
 test("a plain command: placeholders filled in, stdout is its last message, a bad exit code is a failure", () => {
