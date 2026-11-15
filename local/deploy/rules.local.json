@@ -91,6 +91,18 @@
       "parallel": 1
     },
     {
+      "name": "本地资料处理",
+      "when": {
+        "source": "workspace",
+        "types": ["content.file.requested"]
+      },
+      "to": "workbuddy-command",
+      "cwd": "/Users/zhangjiaxing/Documents/workspace/content/.automation/file",
+      "skill": "workspace-file",
+      "prompt": "从 workspace-file Skill 第 1 步开始：直接运行 prepare，不要预读 context.json，不要探测环境或列目录。prepare 完成后只读取 input.json，运行 Skill 指定脚本，写结果并 finalize。只处理当前任务目录。",
+      "parallel": 1
+    },
+    {
       "name": "URL 失败巡检",
       "when": {
         "cron": "0 9 * * *"

@@ -28,9 +28,11 @@
 workspace repo   /Users/zhangjiaxing/Documents/workspace
 autoloop home    ~/.agent-autoloop
 workspace skill  <workspace>/.codebuddy/skills/workspace-url
+file skill       <workspace>/.codebuddy/skills/workspace-file
 review skill     <workspace>/.codebuddy/skills/workspace-url-failure-review
-skill links      ~/.codebuddy/skills/{workspace-url,workspace-url-failure-review}
+skill links      ~/.codebuddy/skills/{workspace-url,workspace-file,workspace-url-failure-review}
 staging          <workspace>/content/.automation/url
+file staging     <workspace>/content/.automation/file
 review cwd       <workspace>/content/.automation/url-failure-review
 WorkBuddy Node   ~/.workbuddy/binaries/node/versions/22.22.2-6/bin/node
 ```
@@ -127,7 +129,7 @@ sqlite3 -header -column ~/.agent-autoloop/hub.db \
 
 飞书卡片收到回答后由内置通道直接调用 `hub.answer`，随后 patch 原消息；不需要打开工作台，也不需要公网回调地址。
 
-## 当前 URL 集成
+## 当前内容任务集成
 
 当前生产链路只有一条：
 
@@ -141,15 +143,28 @@ workspace outbox
   -> workspace 校验、写不可变版本、发 content.url.completed
 ```
 
-workspace 中仍保留 inline URL Worker，作为本地回退路径。生产 `.env` 必须是：
+本地资料链路：
+
+```text
+workspace outbox
+  -> POST /v1/events
+  -> 规则“本地资料处理”
+  -> workbuddy-command
+  -> workspace-file Skill
+  -> prepare -> Agent 写 content/.automation/file -> finalize
+  -> workspace 校验、直接入库、发 content.file.completed
+```
+
+workspace 中不保留内容执行 worker。生产 `.env` 必须是：
 
 ```text
 AUTOMATION_EVENTS_ENABLED=1
 AUTOMATION_API_ENABLED=1
-URL_WORKER_ENABLED=0
 ```
 
-这不是新旧双跑。旧 Worker 只在开关打开时启动；当前开关关闭，不参与生产处理。回退时先暂停 autoloop 规则，再切换开关，不能同时打开两条链路。旧 `.url-jobs` 和 inline Worker 的清理放到新链路稳定运行之后单独执行，清理前先确认数据库、`content/` 和封面目录有可恢复备份。
+inline URL Worker、`FileIngestionWorker`、`CodeBuddyRunner` 和 `.url-jobs` 均已删除，不存在新旧双跑或本地回退执行路径。autoloop 故障时暂停规则，让任务保持 `queued`，不要在工作台内另起解析流程。
+
+本地资料使用 `workbuddy-command`：Codex 的 `edit` 沙箱不能访问项目外的 `uv` 缓存和工作台内部 API。不要为了这个任务把通用 Codex 配置改成 `full`；如要更换执行 Agent，单独新增具备所需权限的专用 Agent，并为固定命令维护最小权限模板。
 
 ## 维护方式
 
