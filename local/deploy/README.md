@@ -26,8 +26,10 @@
 workspace repo   /Users/zhangjiaxing/Documents/workspace
 autoloop home    ~/.agent-autoloop
 workspace skill  <workspace>/.codebuddy/skills/workspace-url
-skill link       ~/.codebuddy/skills/workspace-url
+review skill     <workspace>/.codebuddy/skills/workspace-url-failure-review
+skill links      ~/.codebuddy/skills/{workspace-url,workspace-url-failure-review}
 staging          <workspace>/content/.automation/url
+review cwd       <workspace>/content/.automation/url-failure-review
 WorkBuddy Node   ~/.workbuddy/binaries/node/versions/22.22.2-6/bin/node
 ```
 
@@ -100,6 +102,14 @@ URL 任务查看：
 node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts status
 node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts why <run>
 ```
+
+失败巡检默认每天 09:00 运行。需要立即验证时：
+
+```bash
+node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts run "URL 失败巡检"
+```
+
+巡检只查询失败任务并发出“重新处理 / 忽略”卡片，不自动重跑。回答后由同一 Skill 调用工作台内部 API，任务重新入队或记录为忽略。
 
 ## 当前 URL 集成
 

@@ -33,8 +33,10 @@ repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 deploy_root=$repo_root/local/deploy
 autoloop_home=${AGENT_AUTOLOOP_HOME:-"$HOME/.agent-autoloop"}
 workspace_root=${WORKSPACE_ROOT:-"$HOME/Documents/workspace"}
-skill_source=$workspace_root/.codebuddy/skills/workspace-url
-skill_link=$HOME/.codebuddy/skills/workspace-url
+url_skill_source=$workspace_root/.codebuddy/skills/workspace-url
+url_skill_link=$HOME/.codebuddy/skills/workspace-url
+review_skill_source=$workspace_root/.codebuddy/skills/workspace-url-failure-review
+review_skill_link=$HOME/.codebuddy/skills/workspace-url-failure-review
 workbuddy_node=${WORKBUDDY_NODE:-"$HOME/.workbuddy/binaries/node/versions/22.22.2-6/bin/node"}
 workbuddy_cli=${WORKBUDDY_CLI:-"$(dirname "$workbuddy_node")/codebuddy"}
 
@@ -47,7 +49,9 @@ node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 24 ? 0 : 1)
 [ -x "$workbuddy_node" ] || fail "找不到 WorkBuddy Node 22：$workbuddy_node"
 [ -x "$workbuddy_cli" ] || fail "找不到 WorkBuddy CLI：$workbuddy_cli"
 [ -d "$workspace_root" ] || fail "找不到 workspace：$workspace_root"
-[ -f "$skill_source/SKILL.md" ] || fail "找不到 workspace-url Skill：$skill_source"
+[ -f "$url_skill_source/SKILL.md" ] || fail "找不到 workspace-url Skill：$url_skill_source"
+[ -f "$review_skill_source/SKILL.md" ] ||
+  fail "找不到 workspace-url-failure-review Skill：$review_skill_source"
 
 node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' \
   "$deploy_root/rules.local.json" || fail "rules.local.json 不是合法 JSON"
@@ -79,33 +83,53 @@ install_config() {
   printf '已安装：%s\n' "$target_file"
 }
 
+ensure_skill_link() {
+  source_directory=$1
+  link_path=$2
+  if [ -L "$link_path" ]; then
+    linked=$(readlink "$link_path")
+    [ "$linked" = "$source_directory" ] ||
+      fail "$link_path 已指向 $linked，不自动覆盖"
+  elif [ -e "$link_path" ]; then
+    fail "$link_path 已存在且不是符号链接，不自动覆盖"
+  else
+    ln -s "$source_directory" "$link_path"
+    printf '已链接：%s -> %s\n' "$link_path" "$source_directory"
+  fi
+}
+
 if [ "$mode" = --install-config ]; then
-  mkdir -p "$autoloop_home" "$workspace_root/content/.automation/url" "$(dirname "$skill_link")"
+  mkdir -p "$autoloop_home" \
+    "$workspace_root/content/.automation/url" \
+    "$workspace_root/content/.automation/url-failure-review" \
+    "$(dirname "$url_skill_link")"
   chmod 700 "$autoloop_home"
   install_config "$deploy_root/rules.local.json" "$autoloop_home/rules.json"
   install_config "$deploy_root/workbuddy-command.settings.json" \
     "$autoloop_home/workbuddy-command.settings.json"
-
-  if [ -L "$skill_link" ]; then
-    linked=$(readlink "$skill_link")
-    [ "$linked" = "$skill_source" ] || fail "$skill_link 已指向 $linked，不自动覆盖"
-  elif [ -e "$skill_link" ]; then
-    fail "$skill_link 已存在且不是符号链接，不自动覆盖"
-  else
-    ln -s "$skill_source" "$skill_link"
-    printf '已链接：%s -> %s\n' "$skill_link" "$skill_source"
-  fi
+  ensure_skill_link "$url_skill_source" "$url_skill_link"
+  ensure_skill_link "$review_skill_source" "$review_skill_link"
 fi
 
 private_file "$autoloop_home/workspace.env"
 private_file "$autoloop_home/agent.env"
 
-if [ -L "$skill_link" ]; then
-  [ "$(readlink "$skill_link")" = "$skill_source" ] || fail "$skill_link 指向了错误的位置"
-elif [ -e "$skill_link" ]; then
-  fail "$skill_link 已存在且不是符号链接"
+if [ -L "$url_skill_link" ]; then
+  [ "$(readlink "$url_skill_link")" = "$url_skill_source" ] ||
+    fail "$url_skill_link 指向了错误的位置"
+elif [ -e "$url_skill_link" ]; then
+  fail "$url_skill_link 已存在且不是符号链接"
 else
-  fail "Skill 尚未链接；运行 --install-config 创建"
+  fail "workspace-url Skill 尚未链接；运行 --install-config 创建"
+fi
+
+if [ -L "$review_skill_link" ]; then
+  [ "$(readlink "$review_skill_link")" = "$review_skill_source" ] ||
+    fail "$review_skill_link 指向了错误的位置"
+elif [ -e "$review_skill_link" ]; then
+  fail "$review_skill_link 已存在且不是符号链接"
+else
+  fail "workspace-url-failure-review Skill 尚未链接；运行 --install-config 创建"
 fi
 
 [ -f "$autoloop_home/rules.json" ] || fail "缺少 $autoloop_home/rules.json"
@@ -113,6 +137,8 @@ fi
   fail "缺少 $autoloop_home/workbuddy-command.settings.json"
 [ -d "$workspace_root/content/.automation/url" ] ||
   fail "缺少共享暂存目录；运行 --install-config 创建"
+[ -d "$workspace_root/content/.automation/url-failure-review" ] ||
+  fail "缺少失败巡检工作目录；运行 --install-config 创建"
 
 printf '本机部署检查通过。\n'
 printf '启动：cd %s && node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts up\n' "$repo_root"

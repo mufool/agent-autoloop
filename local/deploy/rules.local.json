@@ -85,6 +85,17 @@
       "skill": "workspace-url",
       "prompt": "按 workspace-url Skill 处理本轮 URL 事件，开始任务，在当前结果目录生成产物，然后通知工作台校验入库。",
       "parallel": 1
+    },
+    {
+      "name": "URL 失败巡检",
+      "when": {
+        "cron": "0 9 * * *"
+      },
+      "to": "workbuddy-command",
+      "cwd": "/Users/zhangjiaxing/Documents/workspace/content/.automation/url-failure-review",
+      "skill": "workspace-url-failure-review",
+      "prompt": "按 workspace-url-failure-review Skill 巡检失败 URL 任务。没有 answers 时查询并生成确认卡片；有 answers 时只执行用户选择的重新处理或忽略。不要自动重跑。",
+      "parallel": 1
     }
   ],
   "elsewhere": []
