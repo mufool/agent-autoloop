@@ -1,0 +1,2 @@
+#!/bin/sh
+exec "$HOME/.nvm/versions/node/v22.19.0/bin/lark-cli" --profile agent-autoloop "$@"

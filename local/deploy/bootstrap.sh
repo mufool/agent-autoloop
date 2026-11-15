@@ -6,7 +6,7 @@ usage() {
 用法：./local/deploy/bootstrap.sh [--check | --install-config]
 
   --check           只检查前置条件、配置格式和文件权限（默认）
-  --install-config  备份并安装 rules.local.json 与 workbuddy-command.settings.json
+  --install-config  备份并安装 rules.local.json、workbuddy-command.settings.json 与飞书 CLI 包装器
 
 不会生成密钥，不会修改 config.json，不会安装 LaunchAgent 或系统服务。
 EOF
@@ -39,6 +39,8 @@ review_skill_source=$workspace_root/.codebuddy/skills/workspace-url-failure-revi
 review_skill_link=$HOME/.codebuddy/skills/workspace-url-failure-review
 workbuddy_node=${WORKBUDDY_NODE:-"$HOME/.workbuddy/binaries/node/versions/22.22.2-6/bin/node"}
 workbuddy_cli=${WORKBUDDY_CLI:-"$(dirname "$workbuddy_node")/codebuddy"}
+feishu_wrapper_source=$deploy_root/bin/lark-cli-autoloop
+feishu_wrapper_target=$autoloop_home/bin/lark-cli-autoloop
 
 command -v node >/dev/null 2>&1 || fail "缺少 node"
 command -v uv >/dev/null 2>&1 || fail "缺少 uv"
@@ -52,6 +54,7 @@ node -e 'process.exit(Number(process.versions.node.split(".")[0]) >= 24 ? 0 : 1)
 [ -f "$url_skill_source/SKILL.md" ] || fail "找不到 workspace-url Skill：$url_skill_source"
 [ -f "$review_skill_source/SKILL.md" ] ||
   fail "找不到 workspace-url-failure-review Skill：$review_skill_source"
+[ -x "$feishu_wrapper_source" ] || fail "找不到可执行的飞书 CLI 包装器：$feishu_wrapper_source"
 
 node -e 'JSON.parse(require("node:fs").readFileSync(process.argv[1], "utf8"))' \
   "$deploy_root/rules.local.json" || fail "rules.local.json 不是合法 JSON"
@@ -107,6 +110,9 @@ if [ "$mode" = --install-config ]; then
   install_config "$deploy_root/rules.local.json" "$autoloop_home/rules.json"
   install_config "$deploy_root/workbuddy-command.settings.json" \
     "$autoloop_home/workbuddy-command.settings.json"
+  mkdir -p "$(dirname "$feishu_wrapper_target")"
+  install -m 700 "$feishu_wrapper_source" "$feishu_wrapper_target"
+  printf '已安装：%s\n' "$feishu_wrapper_target"
   ensure_skill_link "$url_skill_source" "$url_skill_link"
   ensure_skill_link "$review_skill_source" "$review_skill_link"
 fi
@@ -135,6 +141,7 @@ fi
 [ -f "$autoloop_home/rules.json" ] || fail "缺少 $autoloop_home/rules.json"
 [ -f "$autoloop_home/workbuddy-command.settings.json" ] ||
   fail "缺少 $autoloop_home/workbuddy-command.settings.json"
+[ -x "$feishu_wrapper_target" ] || fail "缺少飞书 CLI 包装器；运行 --install-config 创建"
 [ -d "$workspace_root/content/.automation/url" ] ||
   fail "缺少共享暂存目录；运行 --install-config 创建"
 [ -d "$workspace_root/content/.automation/url-failure-review" ] ||

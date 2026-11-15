@@ -8,6 +8,7 @@
 - 停止服务用 `Ctrl-C`，或向该进程发送 `SIGTERM`。
 - hub 监听 `127.0.0.1:3350`，不开放公网端口。
 - hub、worker、桌面通知由 `~/.agent-autoloop/config.json` 决定是否在同一进程启动。
+- 飞书使用内置 `feishu` 通道：卡片按钮直接回调中台，不跳转工作台。通知使用独立飞书应用和 `lark-cli` profile，避免与 Hermes 争夺同一应用的长连接。
 - 运行时数据、密钥和 `hub.db` 都在 `~/.agent-autoloop/`，不进入 Git。
 
 ## 文件
@@ -16,9 +17,10 @@
 |---|---|
 | `rules.local.json` | 本机 Agent、来源、通道和规则快照，不含密钥 |
 | `workbuddy-command.settings.json` | WorkBuddy Command 的本机文件与命令权限模板 |
+| `bin/lark-cli-autoloop` | 固定使用 `agent-autoloop` profile 的 `lark-cli` 包装器；安装到 `~/.agent-autoloop/bin/lark-cli-autoloop` |
 | `config.example.json` | `~/.agent-autoloop/config.json` 的结构参考，不含密钥 |
 | `env.example` | `workspace.env` 和 `agent.env` 的键名说明，不含真实值 |
-| `bootstrap.sh` | 检查前置条件，或在显式要求时安装两份配置 |
+| `bootstrap.sh` | 检查前置条件，或在显式要求时安装两份配置和飞书 CLI 包装器 |
 
 本机配置快照假设这些路径：
 
@@ -109,7 +111,21 @@ node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts why <run>
 node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts run "URL 失败巡检"
 ```
 
-巡检只查询失败任务并发出“重新处理 / 忽略”卡片，不自动重跑。回答后由同一 Skill 调用工作台内部 API，任务重新入队或记录为忽略。
+巡检查询失败、完成但不完整和长时间运行三类任务并发出确认卡片，不自动重跑。回答后由同一 Skill 调用工作台内部 API，任务重新入队、记录为忽略，或对卡住的运行做安全恢复。
+
+巡检现在覆盖失败、完成但不完整、运行超过 30 分钟三类任务；第三类卡片使用“重新处理 / 继续等待”，只有用户选择重新处理时才恢复卡住的运行。
+
+飞书通知验证：
+
+```bash
+node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts doctor
+sqlite3 -header -column ~/.agent-autoloop/hub.db \
+  "select channel,card_id,version,ref,error from deliveries where channel='feishu' order by first_try_at desc limit 5;"
+```
+
+飞书的 key 必须通过 `agent-autoloop key new channel feishu` 生成，并在 `config.json` 中使用同名通道项。`lark` 指向包装器，确保只使用独立的 `agent-autoloop` profile。应用需要开启机器人能力，并订阅 `card.action.trigger`（长连接）；卡片读取还需要 `im:message:readonly`。
+
+飞书卡片收到回答后由内置通道直接调用 `hub.answer`，随后 patch 原消息；不需要打开工作台，也不需要公网回调地址。
 
 ## 当前 URL 集成
 

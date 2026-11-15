@@ -16,6 +16,12 @@
   "channels": {
     "desktop": {
       "key": "<desktop-channel-key>"
+    },
+    "feishu": {
+      "use": "feishu",
+      "key": "<feishu-channel-key>",
+      "user": "<feishu-open-id>",
+      "lark": "/Users/zhangjiaxing/.agent-autoloop/bin/lark-cli-autoloop"
     }
   }
 }

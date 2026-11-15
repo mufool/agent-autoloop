@@ -61,6 +61,10 @@
   "channels": {
     "desktop": {
       "name": "桌面通知"
+    },
+    "feishu": {
+      "name": "飞书",
+      "answerers": ["ou_REPLACE_ME"]
     }
   },
   "rules": [
