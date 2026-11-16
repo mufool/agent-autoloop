@@ -78,7 +78,7 @@ node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts key new source 
 ./local/deploy/bootstrap.sh --install-config
 ```
 
-它不会生成或覆盖 `config.json`、`workspace.env`、`agent.env`、`master.key`，也不会安装系统服务。首次机器如果没有 `config.json`，先用 `init --no-service` 初始化，再执行上面的安装命令。`config.example.json` 只用于核对结构和排查，不要用占位密钥覆盖已经初始化好的 `config.json`。
+它不会生成或覆盖 `config.json`、`workspace.env`、`agent.env`、`master.key`，也不会安装系统服务。重装时如果模板仍是 `ou_REPLACE_ME`，会保留现有 `rules.json` 的飞书 `answerers`；首次安装仍需手动替换占位值，否则 `--check` 会失败。首次机器如果没有 `config.json`，先用 `init --no-service` 初始化，再执行上面的安装命令。`config.example.json` 只用于核对结构和排查，不要用占位密钥覆盖已经初始化好的 `config.json`。
 
 ## 启停与验证
 

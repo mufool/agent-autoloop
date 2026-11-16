@@ -89,6 +89,41 @@ install_config() {
   printf '已安装：%s\n' "$target_file"
 }
 
+install_rules() {
+  source_file=$1
+  target_file=$2
+  if [ -f "$target_file" ]; then
+    backup="$target_file.bak-$(date +%Y%m%d%H%M%S)"
+    cp -p "$target_file" "$backup"
+    printf '已备份：%s\n' "$backup"
+  fi
+  temporary=$(mktemp "$target_file.XXXXXX")
+  node - "$source_file" "$target_file" "$temporary" <<'NODE'
+const fs = require("node:fs");
+const [sourcePath, targetPath, outputPath] = process.argv.slice(2);
+const source = JSON.parse(fs.readFileSync(sourcePath, "utf8"));
+if (fs.existsSync(targetPath)) {
+  const current = JSON.parse(fs.readFileSync(targetPath, "utf8"));
+  const templateAnswerers = source?.channels?.feishu?.answerers;
+  const currentAnswerers = current?.channels?.feishu?.answerers;
+  if (
+    Array.isArray(templateAnswerers) &&
+    templateAnswerers.length === 1 &&
+    templateAnswerers[0] === "ou_REPLACE_ME" &&
+    Array.isArray(currentAnswerers) &&
+    currentAnswerers.length > 0 &&
+    currentAnswerers.every((value) => value !== "ou_REPLACE_ME")
+  ) {
+    source.channels.feishu.answerers = currentAnswerers;
+  }
+}
+fs.writeFileSync(outputPath, `${JSON.stringify(source, null, 2)}\n`, { mode: 0o600 });
+NODE
+  chmod 600 "$temporary"
+  mv "$temporary" "$target_file"
+  printf '已安装：%s\n' "$target_file"
+}
+
 ensure_skill_link() {
   source_directory=$1
   link_path=$2
@@ -111,7 +146,7 @@ if [ "$mode" = --install-config ]; then
     "$workspace_root/content/.automation/url-failure-review" \
     "$(dirname "$url_skill_link")"
   chmod 700 "$autoloop_home"
-  install_config "$deploy_root/rules.local.json" "$autoloop_home/rules.json"
+  install_rules "$deploy_root/rules.local.json" "$autoloop_home/rules.json"
   install_config "$deploy_root/workbuddy-command.settings.json" \
     "$autoloop_home/workbuddy-command.settings.json"
   mkdir -p "$(dirname "$feishu_wrapper_target")"
@@ -153,6 +188,11 @@ else
 fi
 
 [ -f "$autoloop_home/rules.json" ] || fail "缺少 $autoloop_home/rules.json"
+node - "$autoloop_home/rules.json" <<'NODE' || fail "rules.json 的飞书 answerers 仍是占位值，请填写后再检查"
+const data = JSON.parse(require("node:fs").readFileSync(process.argv[2], "utf8"));
+const answerers = data?.channels?.feishu?.answerers;
+process.exit(Array.isArray(answerers) && answerers.length && answerers.every((value) => value !== "ou_REPLACE_ME") ? 0 : 1);
+NODE
 [ -f "$autoloop_home/workbuddy-command.settings.json" ] ||
   fail "缺少 $autoloop_home/workbuddy-command.settings.json"
 [ -x "$feishu_wrapper_target" ] || fail "缺少飞书 CLI 包装器；运行 --install-config 创建"
